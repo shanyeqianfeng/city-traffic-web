@@ -110,6 +110,7 @@ canvas#graphCanvas { width: 100%; height: 360px; border: 1px solid #e8edf3; bord
 4 5 10</textarea>
       </div>
       <div class="section">
+        <button class="btn btn-success" onclick="confirmInput()" style="width:100%;margin-bottom:8px;">✓ 确认数据</button>
         <label style="display:flex;align-items:center;gap:8px;">
           <span style="font-size:12px;color:#888;">动态时段名称（逗号分隔）：</span>
           <input type="text" id="periodNames" value="高峰期,低峰期" style="flex:1;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:13px;outline:none;">
@@ -832,6 +833,24 @@ function dispWidth(s) {
     w += c.charCodeAt(0) > 127 ? 2 : 1;
   }
   return w;
+}
+
+// ============ 确认输入 ============
+function confirmInput() {
+  let input = parseInput('manual');
+  if (!input) return;
+  // 更新只读参数显示
+  document.getElementById('vertices').value = input.V;
+  document.getElementById('edges').value = input.E;
+  document.getElementById('source').value = input.s;
+  document.getElementById('sink').value = input.t;
+  let hint = '✓ 已识别: ' + input.V + ' 节点, ' + input.E + ' 条边';
+  if (input.numPeriods > 1) {
+    hint += '\n📊 检测到多时段数据（' + input.numPeriods + '个时段），请点击「动态模拟」运行对比';
+  } else {
+    hint += '\n▶ 请点击「计算最大流」运行算法';
+  }
+  writeLog(hint);
 }
 
 // ============ 计算主入口 ============
