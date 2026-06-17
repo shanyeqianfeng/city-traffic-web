@@ -560,7 +560,7 @@ function renderGraph() {
   let nodeR = Math.max(5, 16 / scFactor);
   let fontSize = Math.max(6, 13 / scFactor);
   let labelFont = Math.max(5, 11 / scFactor);
-  let arrowS = Math.max(3, 8 / scFactor);
+  let arrowS = Math.max(2, 5 / scFactor);
   let nodes = graphCache._layoutNodes;
   if (!nodes) {
     let cx = W / 2, cy = H / 2;
@@ -612,7 +612,7 @@ function renderGraph() {
 
     let color = isCut ? '#ea4335' : (isFull ? '#ff6d01' : '#4285f4');
     let opacity = (showEdgeLabel || f > 0) ? 1 : 0.4;
-    let lineW = Math.max(1, Math.min(6, cap / 3) / scFactor);
+    let lineW = Math.max(0.5, Math.min(3.5, cap / 5) / scFactor);
 
     // 线条
     let line = document.createElementNS(ns, 'line');
@@ -665,8 +665,8 @@ function renderGraph() {
     circle.setAttribute('cy', n.y);
     circle.setAttribute('r', nodeR);
     circle.setAttribute('fill', color);
-    circle.setAttribute('stroke', '#fff');
-    circle.setAttribute('stroke-width', 3);
+    circle.setAttribute('stroke', '#222');
+    circle.setAttribute('stroke-width', 1.5);
     content.appendChild(circle);
 
     let txt = document.createElementNS(ns, 'text');
