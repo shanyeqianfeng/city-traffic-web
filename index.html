@@ -89,11 +89,11 @@ canvas#graphCanvas { width: 100%; height: 360px; border: 1px solid #e8edf3; bord
     <div id="tab-manual" class="tab-content active">
       <div class="section">
         <label>基本参数</label>
-        <div class="input-row">
-          <input type="number" id="vertices" placeholder="顶点数 V" min="2" value="6">
-          <input type="number" id="edges" placeholder="边数 E" min="0" value="8">
-          <input type="number" id="source" placeholder="源点 s" min="0" value="0">
-          <input type="number" id="sink" placeholder="汇点 t" min="0" value="5">
+        <div style="display:flex;gap:8px;">
+          <div style="flex:1;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">顶点 V</label><input type="number" id="vertices" min="2" value="6" style="width:100%;padding:8px 6px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px;outline:none;box-sizing:border-box;"></div>
+          <div style="flex:1;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">边数 E</label><input type="number" id="edges" min="0" value="8" style="width:100%;padding:8px 6px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px;outline:none;box-sizing:border-box;"></div>
+          <div style="flex:1;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">源点 s</label><input type="number" id="source" min="0" value="0" style="width:100%;padding:8px 6px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px;outline:none;box-sizing:border-box;"></div>
+          <div style="flex:1;"><label style="font-size:11px;color:#888;display:block;margin-bottom:2px;">汇点 t</label><input type="number" id="sink" min="0" value="5" style="width:100%;padding:8px 6px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px;outline:none;box-sizing:border-box;"></div>
         </div>
       </div>
       <div class="section">
@@ -471,7 +471,7 @@ function formatResult(result, input) {
       bar = '[' + '█'.repeat(w) + '░'.repeat(20-w) + ']';
     }
     let status = f >= cap && cap > 0 ? ' ⚠ 瓶颈' : '';
-    s += '    ' + u + ' → ' + v + '  ' + f + '/' + cap + '  (' + pct + '%)  ' + bar + status + '\n';
+    s += '  ' + padDisp(u + ' → ' + v, 8) + '  ' + padDisp(f + '/' + cap, 12) + '  (' + padDisp(pct, 6) + ')  ' + bar + status + '\n';
   }
 
   s += '\n  瓶颈路段（最小割）:\n';
