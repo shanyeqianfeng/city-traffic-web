@@ -480,10 +480,9 @@ function renderGraph() {
   ctx.save();
   ctx.setTransform(sc, 0, 0, sc, ox, oy);
 
-  // 计算节点位置（在变换后的坐标系中）
-  let cx = (W / 2 - ox) / sc;
-  let cy = (H / 2 - oy) / sc;
-  let radius = Math.min(W / sc, H / sc) * 0.35;
+  // 节点位置（固定坐标系，transform 统一缩放）
+  let cx = W / 2, cy = H / 2;
+  let radius = Math.min(W, H) * 0.35;
   let nodeR = 16, fontSize = 13, labelFont = 11, arrowS = 8;
   let nodes = [];
   for (let i = 0; i < V; i++) {
