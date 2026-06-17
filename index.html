@@ -135,9 +135,8 @@ canvas#graphCanvas { width: 100%; height: 360px; border: 1px solid #e8edf3; bord
       </div>
       <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="loadPreset()">加载预设</button>
       <div class="section" style="margin-top:12px;">
-        <label>动态流量模拟</label>
-        <input type="number" id="numPeriods" placeholder="时段数" value="2" min="2" max="5" style="width:80px;padding:8px;border:1px solid #d0d5dd;border-radius:6px;margin-bottom:8px;">
-        <button class="btn btn-warning" style="width:100%;" onclick="runDynamicSim()">📊 动态流量模拟</button>
+        <label>动态流量模拟（对比多时段通行能力）</label>
+        <button class="btn btn-warning" style="width:100%;margin-top:4px;" onclick="runDynamicSim()">📊 运行动态模拟</button>
       </div>
     </div>
   </div>
@@ -501,8 +500,7 @@ function runDynamicSim() {
     return;
   }
 
-  let numP = parseInt(document.getElementById('numPeriods').value) || 2;
-  let n = Math.min(numP, dp.periodNames.length);
+  let n = dp.periodNames.length;
 
   let s = '';
   s += '========================================\n';
