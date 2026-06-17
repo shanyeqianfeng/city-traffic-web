@@ -483,14 +483,9 @@ function formatResult(result, input) {
   for (let e of input.edges) {
     let [u, v, cap] = e;
     let f = result.flowMatrix[u][v] || 0;
-    let pct = cap > 0 ? (f / cap * 100).toFixed(1) : 0;
-    let bar = '';
-    if (cap > 0) {
-      let w = Math.round(f / cap * 20);
-      bar = '[' + '█'.repeat(w) + '░'.repeat(20-w) + ']';
-    }
+    let pct = cap > 0 ? (f / cap * 100).toFixed(1) : '—';
     let status = f >= cap && cap > 0 ? ' ⚠ 瓶颈' : '';
-    s += '  ' + padDisp(u + ' → ' + v, 6) + ' ' + padDisp(f + '/' + cap, 10) + ' (' + padDisp(pct, 5) + ') ' + bar + status + '\n';
+    s += '  ' + padDisp(u + ' → ' + v, 6) + ' ' + padDisp(f + '/' + cap, 10) + '  ' + padDisp(pct, 6) + '%' + status + '\n';
   }
 
   s += '\n  瓶颈路段（最小割）:\n';
