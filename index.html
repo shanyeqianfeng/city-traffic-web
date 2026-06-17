@@ -785,7 +785,6 @@ function runDynamicReport(V, E, s, t, allCaps, edgePairs, periodNames, name) {
   let lastCap = allCaps[n-1];
   let lastEdges = edgePairs.map((e, i) => [e[0], e[1], lastCap[i]]);
   drawGraph(V, lastEdges, lastResult.flowMatrix, lastResult.reachable, s, t);
-  graphCache = { V, E, s, t, edges: lastEdges };
 }
 
 function padDisp(s, w) {
@@ -810,7 +809,6 @@ function computeMaxFlow() {
 
   writeLog(formatResult(result, input));
   drawGraph(input.V, input.edges, result.flowMatrix, result.reachable, input.s, input.t);
-  graphCache = input;
 }
 
 function writeLog(msg) {
