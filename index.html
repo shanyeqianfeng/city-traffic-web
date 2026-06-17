@@ -546,8 +546,12 @@ function renderGraph() {
   content.setAttribute('transform', 'translate(' + ox + ',' + oy + ') scale(' + sc + ')');
   content.innerHTML = '';
 
-  // 节点位置 — 均匀圆形布局
-  let nodeR = 16, fontSize = 13, labelFont = 11, arrowS = 8;
+  // 缩放自适应：放大时节点变小、边变细，便于观察拓扑
+  let scFactor = Math.pow(viewState.sc, 0.8);
+  let nodeR = Math.max(5, 16 / scFactor);
+  let fontSize = Math.max(6, 13 / scFactor);
+  let labelFont = Math.max(5, 11 / scFactor);
+  let arrowS = Math.max(3, 8 / scFactor);
   let nodes = graphCache._layoutNodes;
   if (!nodes) {
     let cx = W / 2, cy = H / 2;
@@ -580,7 +584,7 @@ function renderGraph() {
 
     let color = isCut ? '#ea4335' : (isFull ? '#ff6d01' : '#4285f4');
     let opacity = (showEdgeLabel || f > 0) ? 1 : 0.4;
-    let lineW = Math.max(2, Math.min(6, cap / 3));
+    let lineW = Math.max(1, Math.min(6, cap / 3) / scFactor);
 
     // 线条
     let line = document.createElementNS(ns, 'line');
