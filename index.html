@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>城市交通网络优化 - 最大流算法</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #333; }
+
+.header { background: linear-gradient(135deg, #1a73e8, #0d47a1); color: #fff; padding: 24px 32px; }
+.header h1 { font-size: 24px; font-weight: 600; }
+.header p { font-size: 14px; opacity: 0.85; margin-top: 4px; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; display: flex; gap: 20px; flex-wrap: wrap; }
+.panel { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 20px; }
+
+.input-panel { flex: 0 0 380px; min-width: 320px; }
+.output-panel { flex: 1; min-width: 500px; }
+.graph-panel { flex: 0 0 420px; min-width: 360px; }
+
+.panel-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #1a73e8; padding-bottom: 8px; border-bottom: 2px solid #e8edf3; }
+
+.section { margin-bottom: 14px; }
+.section label { display: block; font-size: 13px; font-weight: 500; color: #555; margin-bottom: 4px; }
+
+.input-row { display: flex; gap: 8px; }
+.input-row input { flex: 1; padding: 8px 10px; border: 1px solid #d0d5dd; border-radius: 6px; font-size: 14px; outline: none; }
+.input-row input:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+
+textarea { width: 100%; height: 200px; padding: 10px; border: 1px solid #d0d5dd; border-radius: 6px; font-family: 'Consolas', 'Source Code Pro', monospace; font-size: 13px; resize: vertical; outline: none; }
+textarea:focus { border-color: #1a73e8; box-shadow: 0 0 0 2px rgba(26,115,232,0.15); }
+
+textarea#edgeInput { height: 160px; }
+
+.btn-row { display: flex; gap: 8px; margin-top: 12px; }
+.btn { flex: 1; padding: 10px 16px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+.btn-primary { background: #1a73e8; color: #fff; }
+.btn-primary:hover { background: #1557b0; }
+.btn-secondary { background: #e8edf3; color: #333; }
+.btn-secondary:hover { background: #d0d5dd; }
+.btn-success { background: #34a853; color: #fff; }
+.btn-success:hover { background: #2d9249; }
+.btn-warning { background: #fbbc04; color: #333; }
+.btn-warning:hover { background: #e5a800; }
+
+.output-box { padding: 12px; background: #f8fafc; border: 1px solid #e8edf3; border-radius: 6px; font-family: 'Consolas', 'Source Code Pro', monospace; font-size: 13px; min-height: 300px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; }
+
+canvas#graphCanvas { width: 100%; height: 360px; border: 1px solid #e8edf3; border-radius: 6px; background: #fafbfc; }
+
+.demo-btn { margin-top: 8px; }
+.demo-btn a { color: #1a73e8; font-size: 13px; cursor: pointer; text-decoration: none; }
+.demo-btn a:hover { text-decoration: underline; }
+
+.legend { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: #666; }
+.legend-item { display: flex; align-items: center; gap: 4px; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+.legend-dot.source { background: #34a853; }
+.legend-dot.sink { background: #ea4335; }
+.legend-dot.normal { background: #4285f4; }
+.legend-line { width: 20px; height: 3px; background: #4285f4; }
+
+.tab-bar { display: flex; gap: 0; margin-bottom: 12px; border-bottom: 2px solid #e8edf3; }
+.tab { padding: 8px 16px; font-size: 13px; font-weight: 500; cursor: pointer; color: #666; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+.tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+.tab:hover { color: #1a73e8; }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🚦 城市交通网络优化 — 最大流算法</h1>
+  <p>Edmonds-Karp 算法（BFS 增广） • 支持多时段动态流量模拟</p>
+</div>
+
+<div class="container">
+  <!-- 输入面板 -->
+  <div class="panel input-panel">
+    <div class="panel-title">📐 网络输入</div>
+
+    <div class="tab-bar">
+      <div class="tab active" onclick="switchTab('manual', this)">手动输入</div>
+      <div class="tab" onclick="switchTab('preset', this)">预设数据</div>
+    </div>
+
+    <div id="tab-manual" class="tab-content active">
+      <div class="section">
+        <label>基本参数</label>
+        <div class="input-row">
+          <input type="number" id="vertices" placeholder="顶点数 V" min="2" value="6">
+          <input type="number" id="edges" placeholder="边数 E" min="0" value="8">
+          <input type="number" id="source" placeholder="源点 s" min="0" value="0">
+          <input type="number" id="sink" placeholder="汇点 t" min="0" value="5">
+        </div>
+      </div>
+      <div class="section">
+        <label>道路列表（每行: 起点 终点 容量）</label>
+        <textarea id="edgeInput" placeholder="0 1 10&#10;0 2 10&#10;1 3 4&#10;...">0 1 10
+0 2 10
+1 2 2
+1 3 4
+1 4 8
+2 4 9
+3 5 10
+4 5 10</textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="computeMaxFlow()">▶ 计算最大流</button>
+        <button class="btn btn-secondary" onclick="clearOutput()">清空</button>
+      </div>
+    </div>
+
+    <div id="tab-preset" class="tab-content">
+      <div class="section">
+        <label>选择内置测试数据</label>
+        <select id="presetSelect" style="width:100%;padding:8px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px;">
+          <optgroup label="静态路网">
+            <option value="demo_6nodes">演示数据 6节点8边</option>
+            <option value="bridge_10nodes">桥梁网络 10节点</option>
+            <option value="grid_16nodes">网格路网 16节点24边</option>
+            <option value="highway_14nodes">高速路网 14节点</option>
+            <option value="hub_9nodes">枢纽网络 9节点</option>
+            <option value="ring_14nodes">环状路网 14节点</option>
+            <option value="large_25nodes">大型路网 25节点</option>
+          </optgroup>
+          <optgroup label="动态路网">
+            <option value="dynamic_6nodes">动态演示 6节点（高峰/低峰）</option>
+            <option value="dynamic_bridge">动态桥梁 10节点</option>
+            <option value="dynamic_ring">动态环状 14节点</option>
+          </optgroup>
+        </select>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="loadPreset()">加载预设</button>
+      <div class="section" style="margin-top:12px;">
+        <label>动态流量模拟</label>
+        <input type="number" id="numPeriods" placeholder="时段数" value="2" min="2" max="5" style="width:80px;padding:8px;border:1px solid #d0d5dd;border-radius:6px;margin-bottom:8px;">
+        <button class="btn btn-warning" style="width:100%;" onclick="runDynamicSim()">📊 动态流量模拟</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 输出面板 -->
+  <div class="panel output-panel">
+    <div class="panel-title">📊 计算结果</div>
+    <div id="output" class="output-box">点击"计算最大流"开始...</div>
+  </div>
+
+  <!-- 图形面板 -->
+  <div class="panel graph-panel">
+    <div class="panel-title">🗺 网络拓扑</div>
+    <canvas id="graphCanvas"></canvas>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot source"></div> 源点</div>
+      <div class="legend-item"><div class="legend-dot sink"></div> 汇点</div>
+      <div class="legend-item"><div class="legend-dot normal"></div> 节点</div>
+      <div class="legend-item"><div class="legend-line"></div> 有向边</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ 图形状态 ============
+let graphCache = { V: 0, E: 0, s: 0, t: 0, edges: [], adj: [] };
+
+// ============ 标签切换 ============
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ============ 预设数据 ============
+const PRESETS = {
+  demo_6nodes: "6 8 0 5\n0 1 10\n0 2 10\n1 2 2\n1 3 4\n1 4 8\n2 4 9\n3 5 10\n4 5 10",
+
+  bridge_10nodes: "10 13 0 9\n0 1 8\n0 2 12\n1 3 6\n1 4 10\n2 4 8\n2 5 7\n3 6 9\n4 6 5\n4 7 11\n5 7 6\n6 8 8\n7 8 10\n8 9 15",
+
+  grid_16nodes: "16 24 0 15\n0 1 5\n0 4 8\n1 2 6\n1 5 7\n2 3 5\n2 6 9\n3 7 6\n4 5 8\n4 8 10\n5 6 6\n5 9 5\n6 7 7\n6 10 8\n7 11 6\n8 9 9\n8 12 7\n9 10 5\n9 13 8\n10 11 6\n10 14 9\n11 15 7\n12 13 8\n13 14 6\n14 15 5",
+
+  highway_14nodes: "14 16 0 13\n0 1 20\n0 2 15\n1 3 12\n1 4 18\n2 4 10\n2 5 14\n3 6 16\n4 6 8\n4 7 12\n5 7 10\n5 8 15\n6 9 14\n7 9 10\n7 10 12\n8 10 8\n9 11 16\n10 11 10\n11 12 12\n12 13 15",
+
+  hub_9nodes: "9 12 0 8\n0 1 10\n0 2 12\n0 3 8\n1 4 15\n1 5 6\n2 4 10\n2 5 14\n3 5 9\n4 6 12\n4 7 8\n5 7 15\n6 8 10\n7 8 12",
+
+  ring_14nodes: "14 15 0 13\n0 1 8\n1 2 10\n2 3 12\n3 4 8\n4 5 10\n5 6 12\n6 7 8\n7 8 10\n8 9 12\n9 10 8\n10 11 10\n11 12 12\n12 13 8\n13 0 10\n0 7 15",
+
+  large_25nodes: "25 35 0 24\n0 1 12\n0 2 15\n1 3 10\n1 4 8\n2 4 14\n2 5 11\n3 6 9\n3 7 13\n4 7 10\n4 8 12\n5 8 8\n5 9 14\n6 10 11\n7 10 9\n7 11 15\n8 11 10\n8 12 8\n9 12 13\n9 13 10\n10 14 12\n11 14 8\n11 15 11\n12 15 14\n12 16 9\n13 16 10\n13 17 12\n14 18 10\n15 18 13\n15 19 8\n16 19 11\n16 20 9\n17 20 12\n18 21 10\n19 21 8\n19 22 11\n20 22 10\n21 23 12\n22 23 9\n23 24 15"
+};
+
+const DYNAMIC_PRESETS = {
+  dynamic_6nodes: {
+    name: "动态演示",
+    V: 6, E: 8, s: 0, t: 5,
+    periodNames: ["高峰期", "低峰期"],
+    capacities: [
+      [10,10,2,4,8,9,10,10],
+      [15,12,4,6,10,12,12,12]
+    ],
+    edges: [
+      [0,1],[0,2],[1,2],[1,3],[1,4],[2,4],[3,5],[4,5]
+    ]
+  },
+  dynamic_bridge: {
+    name: "桥梁动态",
+    V: 10, E: 13, s: 0, t: 9,
+    periodNames: ["平峰期", "晚高峰"],
+    capacities: [
+      [8,12,6,10,8,7,9,5,11,6,8,10,15],
+      [12,10,8,12,6,9,10,7,10,8,10,12,18]
+    ],
+    edges: [
+      [0,1],[0,2],[1,3],[1,4],[2,4],[2,5],[3,6],[4,6],[4,7],[5,7],[6,8],[7,8],[8,9]
+    ]
+  },
+  dynamic_ring: {
+    name: "环状动态",
+    V: 14, E: 15, s: 0, t: 13,
+    periodNames: ["早高峰", "低峰期"],
+    capacities: [
+      [8,10,12,8,10,12,8,10,12,8,10,12,8,10,15],
+      [12,14,16,12,14,16,12,14,16,12,14,16,12,14,18]
+    ],
+    edges: [
+      [0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,9],[9,10],[10,11],[11,12],[12,13],[13,0],[0,7]
+    ]
+  }
+};
+
+function loadPreset() {
+  let val = document.getElementById('presetSelect').value;
+  let text = PRESETS[val];
+  if (text) {
+    let lines = text.trim().split('\n');
+    let first = lines[0].trim().split(/\s+/);
+    document.getElementById('vertices').value = first[0];
+    document.getElementById('edges').value = first[1];
+    document.getElementById('source').value = first[2];
+    document.getElementById('sink').value = first[3];
+    document.getElementById('edgeInput').value = lines.slice(1).join('\n').trim();
+    switchTab('manual', document.querySelector('.tab'));
+  } else {
+    let d = DYNAMIC_PRESETS[val];
+    if (d) {
+      document.getElementById('vertices').value = d.V;
+      document.getElementById('edges').value = d.E;
+      document.getElementById('source').value = d.s;
+      document.getElementById('sink').value = d.t;
+      let edgeText = d.edges.map((e, i) => e[0] + ' ' + e[1] + ' ' + d.capacities[0][i]).join('\n');
+      document.getElementById('edgeInput').value = edgeText;
+      document.getElementById('numPeriods').value = d.periodNames.length;
+      switchTab('manual', document.querySelector('.tab'));
+    }
+  }
+  writeLog('已加载预设数据：' + document.getElementById('presetSelect').options[document.getElementById('presetSelect').selectedIndex].text);
+  computeMaxFlow();
+}
+
+// ============ Edmonds-Karp 最大流算法 ============
+function edmondsKarp(V, edges, s, t) {
+  // 构建邻接表
+  let adj = Array.from({ length: V }, () => []);
+  let edgeList = [];
+  for (let e of edges) {
+    let [u, v, cap] = e;
+    edgeList.push({ to: v, rev: edgeList.length + 1, cap: cap });
+    edgeList.push({ to: u, rev: edgeList.length - 1, cap: 0 });
+    adj[u].push(edgeList.length - 2);
+    adj[v].push(edgeList.length - 1);
+  }
+
+  let N = edgeList.length;
+  let flow = 0;
+  let flowMatrix = Array.from({ length: V }, () => Array(V).fill(0));
+  let INF = 1e9;
+
+  while (true) {
+    let prevv = Array(V).fill(-1);
+    let preve = Array(V).fill(-1);
+    let dist = Array(V).fill(INF);
+    dist[s] = 0;
+    let q = [s];
+
+    // BFS
+    while (q.length > 0) {
+      let v = q.shift();
+      for (let ei of adj[v]) {
+        let e = edgeList[ei];
+        if (e.cap > 0 && dist[e.to] > dist[v] + 1) {
+          dist[e.to] = dist[v] + 1;
+          prevv[e.to] = v;
+          preve[e.to] = ei;
+          q.push(e.to);
+        }
+      }
+    }
+
+    if (dist[t] === INF) break;
+
+    // 寻找可增广量
+    let d = INF;
+    for (let v = t; v !== s; v = prevv[v]) {
+      d = Math.min(d, edgeList[preve[v]].cap);
+    }
+
+    // 增广
+    for (let v = t; v !== s; v = prevv[v]) {
+      let ei = preve[v];
+      edgeList[ei].cap -= d;
+      edgeList[ei ^ 1].cap += d;
+      let uu = prevv[v];
+      flowMatrix[uu][v] = (flowMatrix[uu][v] || 0) + d;
+    }
+
+    flow += d;
+  }
+
+  // 计算可达性（最小割）
+  let reachable = Array(V).fill(false);
+  let rq = [s];
+  reachable[s] = true;
+  while (rq.length > 0) {
+    let v = rq.shift();
+    for (let ei of adj[v]) {
+      let e = edgeList[ei];
+      if (e.cap > 0 && !reachable[e.to]) {
+        reachable[e.to] = true;
+        rq.push(e.to);
+      }
+    }
+  }
+
+  return { maxFlow: flow, flowMatrix, reachable, adj, edgeList };
+}
+
+// ============ 解析输入 ============
+function parseInput(mode) {
+  if (mode === 'manual') {
+    let V = parseInt(document.getElementById('vertices').value);
+    let E = parseInt(document.getElementById('edges').value);
+    let s = parseInt(document.getElementById('source').value);
+    let t = parseInt(document.getElementById('sink').value);
+    let text = document.getElementById('edgeInput').value.trim();
+    let lines = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+    let edges = [];
+    for (let line of lines) {
+      let parts = line.trim().split(/\s+/);
+      if (parts.length >= 3) {
+        edges.push([parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2])]);
+      }
+    }
+    if (edges.length !== E) {
+      let err = '边数不匹配: 声明 ' + E + ' 条, 实际 ' + edges.length + ' 条';
+      writeLog('错误: ' + err);
+      return null;
+    }
+    return { V, E, s, t, edges };
+  }
+  return null;
+}
+
+// ============ 绘制网络图 ============
+function drawGraph(V, edges, flowMatrix, reachable, s, t) {
+  let canvas = document.getElementById('graphCanvas');
+  let ctx = canvas.getContext('2d');
+  let rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = canvas.parentElement.clientWidth - 0;
+  canvas.height = 360;
+
+  let W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (V === 0) return;
+
+  // 计算节点位置 - 使用圆形布局
+  let cx = W / 2, cy = H / 2;
+  let radius = Math.min(W, H) * 0.35;
+  let nodes = [];
+  for (let i = 0; i < V; i++) {
+    let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
+    nodes.push({
+      x: cx + radius * Math.cos(angle),
+      y: cy + radius * Math.sin(angle),
+      label: String(i)
+    });
+  }
+
+  // 绘制边
+  for (let e of edges) {
+    let [u, v, cap] = e;
+    let f = flowMatrix && flowMatrix[u] ? (flowMatrix[u][v] || 0) : 0;
+    let isFull = f >= cap && cap > 0;
+    let isCut = reachable && reachable[u] === true && reachable[v] === false;
+
+    ctx.beginPath();
+    let x1 = nodes[u].x, y1 = nodes[u].y;
+    let x2 = nodes[v].x, y2 = nodes[v].y;
+    let dx = x2 - x1, dy = y2 - y1;
+    let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    let nx = dx/dist, ny = dy/dist;
+    let offset = 12;
+    let ox = -ny * offset/5, oy = nx * offset/5;
+
+    ctx.moveTo(x1 + nx*15 + ox, y1 + ny*15 + oy);
+    ctx.lineTo(x2 - nx*15 + ox, y2 - ny*15 + oy);
+
+    let color = isCut ? '#ea4335' : (isFull ? '#ff6d01' : '#4285f4');
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(2, Math.min(6, cap / 3));
+    ctx.stroke();
+
+    // 箭头
+    let arrowSize = 8;
+    let angle = Math.atan2(y2 - y1, x2 - x1);
+    let ax = x2 - nx*15 + ox, ay = y2 - ny*15 + oy;
+    ctx.beginPath();
+    ctx.moveTo(ax, ay);
+    ctx.lineTo(ax - arrowSize * Math.cos(angle - 0.4), ay - arrowSize * Math.sin(angle - 0.4));
+    ctx.lineTo(ax - arrowSize * Math.cos(angle + 0.4), ay - arrowSize * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // 容量/流量 标签
+    let midX = (x1 + x2) / 2 + ox * 3;
+    let midY = (y1 + y2) / 2 + oy * 3;
+    ctx.font = '11px Consolas, sans-serif';
+    ctx.fillStyle = isCut ? '#ea4335' : '#555';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    let label = cap + (f > 0 ? '/' + f : '');
+    ctx.fillText(label, midX, midY - 2);
+  }
+
+  // 绘制节点
+  for (let i = 0; i < V; i++) {
+    let n = nodes[i];
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 16, 0, Math.PI * 2);
+    let color = i === s ? '#34a853' : (i === t ? '#ea4335' : '#4285f4');
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(n.label, n.x, n.y);
+  }
+}
+
+// ============ 计算结果格式化 ============
+function formatResult(result, input) {
+  let s = '';
+  s += '========================================\n';
+  s += '  最大流量: ' + result.maxFlow + '\n';
+  s += '========================================\n\n';
+  s += '  流量分配方案:\n';
+  for (let e of input.edges) {
+    let [u, v, cap] = e;
+    let f = result.flowMatrix[u][v] || 0;
+    let pct = cap > 0 ? (f / cap * 100).toFixed(1) : 0;
+    let bar = '';
+    if (cap > 0) {
+      let w = Math.round(f / cap * 20);
+      bar = '[' + '█'.repeat(w) + '░'.repeat(20-w) + ']';
+    }
+    let status = f >= cap && cap > 0 ? ' ⚠ 瓶颈' : '';
+    s += '    ' + u + ' → ' + v + '  ' + f + '/' + cap + '  (' + pct + '%)  ' + bar + status + '\n';
+  }
+
+  s += '\n  瓶颈路段（最小割）:\n';
+  let found = false;
+  for (let i = 0; i < input.V; i++) {
+    if (result.reachable[i]) {
+      for (let e of input.edges) {
+        let [u, v] = e;
+        if (u === i && !result.reachable[v]) {
+          s += '    瓶颈: ' + i + ' → ' + v + '（已满负荷）\n';
+          found = true;
+        }
+      }
+    }
+  }
+  if (!found) s += '    （无瓶颈路段 — 网络流量未饱和）\n';
+
+  return s;
+}
+
+// ============ 动态模拟 ============
+function runDynamicSim() {
+  let val = document.getElementById('presetSelect').value;
+  let dp = DYNAMIC_PRESETS[val];
+  if (!dp) {
+    writeLog('错误: 请在预设中选择一个动态数据（动态演示 / 动态桥梁 / 动态环状）');
+    return;
+  }
+
+  let numP = parseInt(document.getElementById('numPeriods').value) || 2;
+  let n = Math.min(numP, dp.periodNames.length);
+
+  let s = '';
+  s += '========================================\n';
+  s += '  动态流量模拟 — ' + dp.name + '\n';
+  s += '  网络: ' + dp.V + ' 节点, ' + dp.E + ' 条道路\n';
+  s += '  时段数: ' + n + ' (' + dp.periodNames.join(', ') + ')\n';
+  s += '========================================\n\n';
+
+  let results = [];
+  let maxAcross = 0;
+  for (let pi = 0; pi < n; pi++) {
+    let capList = dp.capacities[pi];
+    let edges = dp.edges.map((e, i) => [e[0], e[1], capList[i]]);
+    let res = edmondsKarp(dp.V, edges, dp.s, dp.t);
+    results.push(res);
+    if (res.maxFlow > maxAcross) maxAcross = res.maxFlow;
+  }
+
+  // 对比表格
+  let col1 = 12, col2 = 14;
+  s += '  +-----------+---------------+---------------+' + '\n';
+  s += '  | ' + padDisp('时段', col1) + ' | ' + padDisp('最大流量', col2) + ' | ' + padDisp('相对比值', col2) + ' |' + '\n';
+  s += '  +-----------+---------------+---------------+' + '\n';
+  for (let pi = 0; pi < n; pi++) {
+    let ratio = maxAcross > 0 ? (results[pi].maxFlow / maxAcross * 100).toFixed(1) + '%' : '0%';
+    s += '  | ' + padDisp(dp.periodNames[pi], col1) + ' | ' + padDisp(String(results[pi].maxFlow), col2) + ' | ' + padDisp(ratio, col2) + ' |' + '\n';
+  }
+  s += '  +-----------+---------------+---------------+' + '\n';
+
+  // 时段详情
+  for (let pi = 0; pi < n; pi++) {
+    s += '\n  * ' + dp.periodNames[pi] + '\n';
+    s += '  最大流量: ' + results[pi].maxFlow + '\n';
+    s += '  流量分配:\n';
+    for (let i = 0; i < dp.edges.length; i++) {
+      let [u, v] = dp.edges[i];
+      let f = results[pi].flowMatrix[u][v] || 0;
+      let cap = dp.capacities[pi][i];
+      s += '    ' + u + ' → ' + v + '  ' + f + '/' + cap + '\n';
+    }
+  }
+
+  // 对比分析
+  let maxIdx = 0, minIdx = 0;
+  for (let i = 1; i < n; i++) {
+    if (results[i].maxFlow > results[maxIdx].maxFlow) maxIdx = i;
+    if (results[i].maxFlow < results[minIdx].maxFlow) minIdx = i;
+  }
+  let diff = results[maxIdx].maxFlow - results[minIdx].maxFlow;
+  let diffPct = maxAcross > 0 ? (diff / maxAcross * 100).toFixed(1) : '0.0';
+
+  s += '\n  ' + dp.periodNames[maxIdx] + '通行能力最强: ' + results[maxIdx].maxFlow + ' 辆/小时\n';
+  s += '  ' + dp.periodNames[minIdx] + '通行能力最弱: ' + results[minIdx].maxFlow + ' 辆/小时\n';
+  s += '  峰谷差: ' + diff + ' ( ' + diffPct + '% )\n\n';
+  s += '  优化策略建议:\n';
+  if (diff > 0) {
+    s += '  * 考虑潮汐车道：在' + dp.periodNames[minIdx] + '将部分车道改为出城方向\n';
+    s += '  * 错峰出行引导：将部分交通流引导至' + dp.periodNames[maxIdx] + '时段\n';
+  }
+  s += '  * 持续监控瓶颈路段，动态调整信号灯配时\n';
+
+  writeLog(s);
+  // 使用最后一个时段绘制
+  let lastResult = results[n-1];
+  let lastCap = dp.capacities[n-1];
+  let lastEdges = dp.edges.map((e, i) => [e[0], e[1], lastCap[i]]);
+  drawGraph(dp.V, lastEdges, lastResult.flowMatrix, lastResult.reachable, dp.s, dp.t);
+  graphCache = { V: dp.V, E: dp.E, s: dp.s, t: dp.t, edges: lastEdges };
+}
+
+function padDisp(s, w) {
+  let d = dispWidth(s), p = w - d;
+  return s + ' '.repeat(Math.max(0, p));
+}
+
+function dispWidth(s) {
+  let w = 0;
+  for (let c of s) {
+    w += c.charCodeAt(0) > 127 ? 2 : 1;
+  }
+  return w;
+}
+
+// ============ 计算主入口 ============
+function computeMaxFlow() {
+  let input = parseInput('manual');
+  if (!input) return;
+
+  let result = edmondsKarp(input.V, input.edges, input.s, input.t);
+
+  writeLog(formatResult(result, input));
+  drawGraph(input.V, input.edges, result.flowMatrix, result.reachable, input.s, input.t);
+  graphCache = input;
+}
+
+function writeLog(msg) {
+  let el = document.getElementById('output');
+  el.textContent = msg;
+  el.scrollTop = 0;
+}
+
+function clearOutput() {
+  document.getElementById('output').textContent = '就绪 —— 点击"计算最大流"开始...';
+  let canvas = document.getElementById('graphCanvas');
+  let ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ============ 初始化 ============
+window.addEventListener('load', () => {
+  computeMaxFlow();
+  window.addEventListener('resize', () => {
+    if (graphCache.V > 0) {
+      let res = edmondsKarp(graphCache.V, graphCache.edges, graphCache.s, graphCache.t);
+      drawGraph(graphCache.V, graphCache.edges, res.flowMatrix, res.reachable, graphCache.s, graphCache.t);
+    }
+  });
+});
+</script>
+</body>
+</html>
