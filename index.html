@@ -622,14 +622,15 @@ function renderGraph() {
     ctx.fill();
 
     // 容量/流量 标签
-    if (showEdgeLabel || f > 0) {
+    let hasFlow = flowMatrix != null;
+    if (showEdgeLabel || !hasFlow || f > 0) {
       let midX = (x1 + x2) / 2 + ox2 * 3;
       let midY = (y1 + y2) / 2 + oy2 * 3;
       ctx.font = labelFont + 'px Consolas, sans-serif';
       ctx.fillStyle = isCut ? '#ea4335' : '#555';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      ctx.fillText(cap + (f > 0 ? '/' + f : ''), midX, midY - 2);
+      ctx.fillText(f + '/' + cap, midX, midY - 2);
     }
   }
 
