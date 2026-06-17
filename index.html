@@ -545,20 +545,16 @@ function renderGraph() {
   content.setAttribute('transform', 'translate(' + ox + ',' + oy + ') scale(' + sc + ')');
   content.innerHTML = '';
 
-  // 节点位置
+  // 节点位置 — 均匀圆形布局
   let nodeR = 16, fontSize = 13, labelFont = 11, arrowS = 8;
   let nodes = graphCache._layoutNodes;
   if (!nodes) {
-    if (V > 14) {
-      nodes = forceDirectedLayout(V, edges, W, H, nodeR);
-    } else {
-      let cx = W / 2, cy = H / 2;
-      let radius = Math.min(W, H) * 0.35;
-      nodes = [];
-      for (let i = 0; i < V; i++) {
-        let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
-        nodes.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), label: String(i) });
-      }
+    let cx = W / 2, cy = H / 2;
+    let radius = Math.min(W, H) * 0.35;
+    nodes = [];
+    for (let i = 0; i < V; i++) {
+      let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
+      nodes.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), label: String(i) });
     }
     graphCache._layoutNodes = nodes;
   }
