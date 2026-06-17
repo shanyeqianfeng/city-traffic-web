@@ -699,7 +699,12 @@ function manualDynamic() {
   }
   let names = document.getElementById('periodNames').value.trim().split(/[,，\s]+/).filter(Boolean);
   while (names.length < input.numPeriods) names.push('时段' + (names.length + 1));
-  runDynamicReport(input.V, input.E, input.s, input.t, input.allCaps, input.edges.map(e => [e[0], e[1]]), names, '手动数据');
+  // allCaps 是 edges×periods → 转置为 periods×edges
+  let periodCaps = [];
+  for (let pi = 0; pi < input.numPeriods; pi++) {
+    periodCaps[pi] = input.allCaps.map(c => c[pi] != null ? c[pi] : c[0]);
+  }
+  runDynamicReport(input.V, input.E, input.s, input.t, periodCaps, input.edges.map(e => [e[0], e[1]]), names, '手动数据');
 }
 
 // ============ 预设动态模拟 ============
