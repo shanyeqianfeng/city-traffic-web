@@ -530,8 +530,9 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
   canvas.width = W;
   canvas.height = H;
 
-  // 保存数据 & 重置视图
+  // 保存数据 & 重置视图（清除缓存的布局）
   graphCache = { V, edges, flowMatrix, reachable, s, t };
+  delete graphCache._layoutNodes;
   resetView();
   // 如果未绑定事件，初始化
   if (!canvas._eventsSetup) {
@@ -554,18 +555,22 @@ function renderGraph() {
   ctx.setTransform(sc, 0, 0, sc, ox, oy);
 
   // 节点位置 — 大图用力导向布局，小图用圆形布局
+  // 只在新图时重新计算，缩放拖拽复用缓存
   let nodeR = 16, fontSize = 13, labelFont = 11, arrowS = 8;
-  let nodes;
-  if (V > 14) {
-    nodes = forceDirectedLayout(V, edges, W, H, nodeR);
-  } else {
-    let cx = W / 2, cy = H / 2;
-    let radius = Math.min(W, H) * 0.35;
-    nodes = [];
-    for (let i = 0; i < V; i++) {
-      let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
-      nodes.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), label: String(i) });
+  let nodes = graphCache._layoutNodes;
+  if (!nodes) {
+    if (V > 14) {
+      nodes = forceDirectedLayout(V, edges, W, H, nodeR);
+    } else {
+      let cx = W / 2, cy = H / 2;
+      let radius = Math.min(W, H) * 0.35;
+      nodes = [];
+      for (let i = 0; i < V; i++) {
+        let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
+        nodes.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), label: String(i) });
+      }
     }
+    graphCache._layoutNodes = nodes;
   }
 
   // 对大型图只绘制非零流量的边标签
