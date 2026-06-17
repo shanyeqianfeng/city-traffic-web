@@ -640,16 +640,24 @@ function renderGraph() {
     // 容量/流量 标签
     let hasFlow = flowMatrix != null;
     if (showEdgeLabel || !hasFlow || f > 0) {
-      let midX = (x1 + x2) / 2 + ox2 * 3;
-      let midY = (y1 + y2) / 2 + oy2 * 3;
+      // 沿边方向排列，靠近出发节点 ~30% 处
+      let nearX = x1 + (x2 - x1) * 0.3 + ox2 * 2;
+      let nearY = y1 + (y2 - y1) * 0.3 + oy2 * 2;
+      let edgeAngle = Math.atan2(y2 - y1, x2 - x1);
+      let angleDeg = edgeAngle * 180 / Math.PI;
+      // 正着可读（-90°~90°），否则翻转 180°
+      let flip = (angleDeg > 90 || angleDeg < -90);
+      let rotCenterX = nearX;
+      let rotCenterY = nearY;
       let txt = document.createElementNS(ns, 'text');
-      txt.setAttribute('x', midX);
-      txt.setAttribute('y', midY - 2);
+      txt.setAttribute('x', nearX);
+      txt.setAttribute('y', nearY);
+      txt.setAttribute('transform', 'rotate(' + (angleDeg + (flip ? 180 : 0)) + ',' + rotCenterX + ',' + rotCenterY + ')');
       txt.setAttribute('fill', isCut ? '#ea4335' : '#555');
       txt.setAttribute('font-size', labelFont);
       txt.setAttribute('font-family', 'Consolas, sans-serif');
-      txt.setAttribute('text-anchor', 'middle');
-      txt.setAttribute('dominant-baseline', 'auto');
+      txt.setAttribute('text-anchor', flip ? 'end' : 'start');
+      txt.setAttribute('dominant-baseline', 'central');
       txt.textContent = f + '/' + cap;
       content.appendChild(txt);
     }
