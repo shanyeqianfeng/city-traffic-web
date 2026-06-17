@@ -17,7 +17,9 @@ body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; ba
 
 .input-panel { flex: 0 0 380px; min-width: 320px; }
 .output-panel { flex: 1; min-width: 500px; }
-.graph-panel { flex: 0 0 420px; min-width: 360px; max-height: 480px; overflow-y: auto; }
+.graph-panel { flex: 0 0 420px; min-width: 360px; height: 480px; overflow: hidden; position: relative; }
+.graph-panel canvas { cursor: grab; }
+.graph-panel canvas:active { cursor: grabbing; }
 
 .panel-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #1a73e8; padding-bottom: 8px; border-bottom: 2px solid #e8edf3; }
 
@@ -46,7 +48,7 @@ textarea#edgeInput { height: 160px; }
 
 .output-box { padding: 12px; background: #f8fafc; border: 1px solid #e8edf3; border-radius: 6px; font-family: 'Consolas', 'Source Code Pro', monospace; font-size: 13px; min-height: 300px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; }
 
-canvas#graphCanvas { width: 100%; border: 1px solid #e8edf3; border-radius: 6px; background: #fafbfc; }
+canvas#graphCanvas { width: 100%; height: 360px; border: 1px solid #e8edf3; border-radius: 6px; background: #fafbfc; }
 
 .demo-btn { margin-top: 8px; }
 .demo-btn a { color: #1a73e8; font-size: 13px; cursor: pointer; text-decoration: none; }
@@ -163,6 +165,10 @@ canvas#graphCanvas { width: 100%; border: 1px solid #e8edf3; border-radius: 6px;
       <div class="legend-item"><div class="legend-dot sink"></div> 汇点</div>
       <div class="legend-item"><div class="legend-dot normal"></div> 节点</div>
       <div class="legend-item"><div class="legend-line"></div> 有向边</div>
+      <div style="margin-left:auto;">
+        <span id="zoomLevel" style="font-size:12px;color:#888;margin-right:8px;">100%</span>
+        <button onclick="resetView()" style="font-size:12px;padding:2px 8px;border:1px solid #d0d5dd;border-radius:4px;background:#fff;cursor:pointer;">重置</button>
+      </div>
     </div>
   </div>
 </div>
@@ -380,28 +386,105 @@ function parseInput(mode) {
   return null;
 }
 
+// ============ 视图状态（缩放/平移） ============
+let viewState = { ox: 0, oy: 0, sc: 1 };
+let isDragging = false;
+let dragStart = { x: 0, y: 0, ox: 0, oy: 0 };
+
+function setupCanvasEvents() {
+  let canvas = document.getElementById('graphCanvas');
+  canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
+  canvas.addEventListener('mousedown', onCanvasMouseDown);
+  canvas.addEventListener('mousemove', onCanvasMouseMove);
+  canvas.addEventListener('mouseup', onCanvasMouseUp);
+  canvas.addEventListener('mouseleave', onCanvasMouseUp);
+}
+
+function onCanvasWheel(e) {
+  e.preventDefault();
+  let rect = e.target.getBoundingClientRect();
+  let mx = e.clientX - rect.left;
+  let my = e.clientY - rect.top;
+  let delta = e.deltaY > 0 ? 0.9 : 1.1;
+  let newSc = Math.max(0.1, Math.min(10, viewState.sc * delta));
+  // Zoom towards cursor
+  viewState.ox = mx - (mx - viewState.ox) * (newSc / viewState.sc);
+  viewState.oy = my - (my - viewState.oy) * (newSc / viewState.sc);
+  viewState.sc = newSc;
+  updateZoomLabel();
+  renderGraph();
+}
+
+function onCanvasMouseDown(e) {
+  if (e.button !== 0) return;
+  isDragging = true;
+  dragStart.x = e.clientX;
+  dragStart.y = e.clientY;
+  dragStart.ox = viewState.ox;
+  dragStart.oy = viewState.oy;
+}
+
+function onCanvasMouseMove(e) {
+  if (!isDragging) return;
+  viewState.ox = dragStart.ox + (e.clientX - dragStart.x);
+  viewState.oy = dragStart.oy + (e.clientY - dragStart.y);
+  renderGraph();
+}
+
+function onCanvasMouseUp() {
+  isDragging = false;
+}
+
+function resetView() {
+  viewState.ox = 0;
+  viewState.oy = 0;
+  viewState.sc = 1;
+  updateZoomLabel();
+  renderGraph();
+}
+
+function updateZoomLabel() {
+  let el = document.getElementById('zoomLevel');
+  if (el) el.textContent = Math.round(viewState.sc * 100) + '%';
+}
+
 // ============ 绘制网络图 ============
 function drawGraph(V, edges, flowMatrix, reachable, s, t) {
   let canvas = document.getElementById('graphCanvas');
-  let ctx = canvas.getContext('2d');
   let parent = canvas.parentElement;
   let W = parent.clientWidth - 0;
-  // 根据节点数自动调整画布高度
-  let minH = 360, nodeSpacing = V > 14 ? 28 : 32;
-  let H = Math.max(minH, V * nodeSpacing);
+  let H = 360;
   canvas.width = W;
   canvas.height = H;
-  canvas.style.height = H + 'px';
+
+  // 保存数据 & 重置视图
+  graphCache = { V, edges, flowMatrix, reachable, s, t };
+  resetView();
+  // 如果未绑定事件，初始化
+  if (!canvas._eventsSetup) {
+    setupCanvasEvents();
+    canvas._eventsSetup = true;
+  }
+}
+
+function renderGraph() {
+  let { V, edges, flowMatrix, reachable, s, t } = graphCache;
+  if (!V || V === 0) return;
+
+  let canvas = document.getElementById('graphCanvas');
+  let ctx = canvas.getContext('2d');
+  let W = canvas.width, H = canvas.height;
+  let { ox, oy, sc } = viewState;
+
   ctx.clearRect(0, 0, W, H);
+  ctx.save();
+  ctx.setTransform(sc, 0, 0, sc, ox, oy);
 
-  // 缩放因子 — 只拉高画布，不改节点大小
+  // 计算节点位置（在变换后的坐标系中）
+  let cx = (W / 2 - ox) / sc;
+  let cy = (H / 2 - oy) / sc;
+  let radius = Math.min(W / sc, H / sc) * 0.35;
   let nodeR = 16, fontSize = 13, labelFont = 11, arrowS = 8;
-
-  if (V === 0) return;
-
-  // 节点位置 - 圆形布局
-  let cx = W / 2, cy = H / 2;
-  let radius = Math.min(W, H) * 0.35;
   let nodes = [];
   for (let i = 0; i < V; i++) {
     let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
@@ -412,7 +495,7 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
     });
   }
 
-  // 对大型图只绘制非零流量的边标签（减少视觉噪点）
+  // 对大型图只绘制非零流量的边标签
   let showEdgeLabel = V <= 18;
 
   // 绘制边
@@ -428,11 +511,11 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
     let dx = x2 - x1, dy = y2 - y1;
     let dist = Math.sqrt(dx*dx + dy*dy) || 1;
     let nx = dx/dist, ny = dy/dist;
-    let offset = 12;
-    let ox = -ny * offset/5, oy = nx * offset/5;
+    let off = 12;
+    let ox2 = -ny * off/5, oy2 = nx * off/5;
 
-    ctx.moveTo(x1 + nx*nodeR + ox, y1 + ny*nodeR + oy);
-    ctx.lineTo(x2 - nx*nodeR + ox, y2 - ny*nodeR + oy);
+    ctx.moveTo(x1 + nx*nodeR + ox2, y1 + ny*nodeR + oy2);
+    ctx.lineTo(x2 - nx*nodeR + ox2, y2 - ny*nodeR + oy2);
 
     let color = isCut ? '#ea4335' : (isFull ? '#ff6d01' : '#4285f4');
     ctx.strokeStyle = color;
@@ -443,7 +526,7 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
 
     // 箭头
     let angle = Math.atan2(y2 - y1, x2 - x1);
-    let ax = x2 - nx*nodeR + ox, ay = y2 - ny*nodeR + oy;
+    let ax = x2 - nx*nodeR + ox2, ay = y2 - ny*nodeR + oy2;
     ctx.beginPath();
     ctx.moveTo(ax, ay);
     ctx.lineTo(ax - arrowS * Math.cos(angle - 0.4), ay - arrowS * Math.sin(angle - 0.4));
@@ -452,16 +535,15 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
     ctx.fillStyle = color;
     ctx.fill();
 
-    // 容量/流量 标签（大型图只标有流量的边）
+    // 容量/流量 标签
     if (showEdgeLabel || f > 0) {
-      let midX = (x1 + x2) / 2 + ox * 3;
-      let midY = (y1 + y2) / 2 + oy * 3;
+      let midX = (x1 + x2) / 2 + ox2 * 3;
+      let midY = (y1 + y2) / 2 + oy2 * 3;
       ctx.font = labelFont + 'px Consolas, sans-serif';
       ctx.fillStyle = isCut ? '#ea4335' : '#555';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
-      let label = cap + (f > 0 ? '/' + f : '');
-      ctx.fillText(label, midX, midY - 2);
+      ctx.fillText(cap + (f > 0 ? '/' + f : ''), midX, midY - 2);
     }
   }
 
@@ -483,6 +565,8 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
     ctx.textBaseline = 'middle';
     ctx.fillText(n.label, n.x, n.y);
   }
+
+  ctx.restore();
 }
 
 // ============ 计算结果格式化 ============
