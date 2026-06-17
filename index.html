@@ -17,7 +17,7 @@ body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; ba
 
 .input-panel { flex: 0 0 380px; min-width: 320px; }
 .output-panel { flex: 1; min-width: 500px; }
-.graph-panel { flex: 0 0 420px; min-width: 360px; }
+.graph-panel { flex: 0 0 420px; min-width: 360px; max-height: 480px; overflow-y: auto; }
 
 .panel-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #1a73e8; padding-bottom: 8px; border-bottom: 2px solid #e8edf3; }
 
@@ -384,18 +384,27 @@ function parseInput(mode) {
 function drawGraph(V, edges, flowMatrix, reachable, s, t) {
   let canvas = document.getElementById('graphCanvas');
   let ctx = canvas.getContext('2d');
-  let rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = canvas.parentElement.clientWidth - 0;
-  canvas.height = 360;
-
-  let W = canvas.width, H = canvas.height;
+  let parent = canvas.parentElement;
+  let W = parent.clientWidth - 0;
+  // 根据节点数自动调整画布高度
+  let minH = 360, nodeSpacing = V > 14 ? 28 : 32;
+  let H = Math.max(minH, V * nodeSpacing);
+  canvas.width = W;
+  canvas.height = H;
   ctx.clearRect(0, 0, W, H);
+
+  // 缩放因子
+  let scale = Math.min(1, 22 / V);
+  let nodeR = Math.max(8, Math.min(16, 320 / V));
+  let fontSize = Math.max(9, Math.min(13, Math.round(220 / V)));
+  let labelFont = Math.max(8, Math.min(11, Math.round(200 / V)));
+  let arrowS = Math.max(5, Math.min(8, scale * 10));
 
   if (V === 0) return;
 
-  // 计算节点位置 - 使用圆形布局
+  // 节点位置 - 圆形布局
   let cx = W / 2, cy = H / 2;
-  let radius = Math.min(W, H) * 0.35;
+  let radius = Math.min(W, H) * Math.min(0.42, 0.35 + (1 - scale) * 0.15);
   let nodes = [];
   for (let i = 0; i < V; i++) {
     let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
@@ -405,6 +414,9 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
       label: String(i)
     });
   }
+
+  // 对大型图只绘制非零流量的边标签（减少视觉噪点）
+  let showEdgeLabel = V <= 18;
 
   // 绘制边
   for (let e of edges) {
@@ -419,53 +431,56 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
     let dx = x2 - x1, dy = y2 - y1;
     let dist = Math.sqrt(dx*dx + dy*dy) || 1;
     let nx = dx/dist, ny = dy/dist;
-    let offset = 12;
+    let offset = Math.max(6, 12 * scale);
     let ox = -ny * offset/5, oy = nx * offset/5;
 
-    ctx.moveTo(x1 + nx*15 + ox, y1 + ny*15 + oy);
-    ctx.lineTo(x2 - nx*15 + ox, y2 - ny*15 + oy);
+    ctx.moveTo(x1 + nx*nodeR + ox, y1 + ny*nodeR + oy);
+    ctx.lineTo(x2 - nx*nodeR + ox, y2 - ny*nodeR + oy);
 
     let color = isCut ? '#ea4335' : (isFull ? '#ff6d01' : '#4285f4');
     ctx.strokeStyle = color;
-    ctx.lineWidth = Math.max(2, Math.min(6, cap / 3));
+    ctx.lineWidth = Math.max(1.5, Math.min(4, cap / 4));
+    ctx.globalAlpha = showEdgeLabel || f > 0 ? 0.85 : 0.5;
     ctx.stroke();
+    ctx.globalAlpha = 1;
 
     // 箭头
-    let arrowSize = 8;
     let angle = Math.atan2(y2 - y1, x2 - x1);
-    let ax = x2 - nx*15 + ox, ay = y2 - ny*15 + oy;
+    let ax = x2 - nx*nodeR + ox, ay = y2 - ny*nodeR + oy;
     ctx.beginPath();
     ctx.moveTo(ax, ay);
-    ctx.lineTo(ax - arrowSize * Math.cos(angle - 0.4), ay - arrowSize * Math.sin(angle - 0.4));
-    ctx.lineTo(ax - arrowSize * Math.cos(angle + 0.4), ay - arrowSize * Math.sin(angle + 0.4));
+    ctx.lineTo(ax - arrowS * Math.cos(angle - 0.4), ay - arrowS * Math.sin(angle - 0.4));
+    ctx.lineTo(ax - arrowS * Math.cos(angle + 0.4), ay - arrowS * Math.sin(angle + 0.4));
     ctx.closePath();
     ctx.fillStyle = color;
     ctx.fill();
 
-    // 容量/流量 标签
-    let midX = (x1 + x2) / 2 + ox * 3;
-    let midY = (y1 + y2) / 2 + oy * 3;
-    ctx.font = '11px Consolas, sans-serif';
-    ctx.fillStyle = isCut ? '#ea4335' : '#555';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    let label = cap + (f > 0 ? '/' + f : '');
-    ctx.fillText(label, midX, midY - 2);
+    // 容量/流量 标签（大型图只标有流量的边）
+    if (showEdgeLabel || f > 0) {
+      let midX = (x1 + x2) / 2 + ox * 3;
+      let midY = (y1 + y2) / 2 + oy * 3;
+      ctx.font = labelFont + 'px Consolas, sans-serif';
+      ctx.fillStyle = isCut ? '#ea4335' : '#555';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      let label = cap + (f > 0 ? '/' + f : '');
+      ctx.fillText(label, midX, midY - 2);
+    }
   }
 
   // 绘制节点
   for (let i = 0; i < V; i++) {
     let n = nodes[i];
     ctx.beginPath();
-    ctx.arc(n.x, n.y, 16, 0, Math.PI * 2);
+    ctx.arc(n.x, n.y, nodeR, 0, Math.PI * 2);
     let color = i === s ? '#34a853' : (i === t ? '#ea4335' : '#4285f4');
     ctx.fillStyle = color;
     ctx.fill();
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = Math.max(1.5, 3 * scale);
     ctx.stroke();
 
-    ctx.font = 'bold 13px sans-serif';
+    ctx.font = 'bold ' + fontSize + 'px sans-serif';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
