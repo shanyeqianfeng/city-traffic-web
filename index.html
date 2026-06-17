@@ -557,25 +557,20 @@ function renderGraph() {
     let cx = W / 2, cy = H / 2;
     nodes = [];
     if (V > 14) {
-      // 内外两圈：内圈奇数、外圈偶数
-      let outerR = Math.min(W, H) * 0.38;
-      let innerR = Math.min(W, H) * 0.22;
-      let evens = [], odds = [];
+      // 多圈布局：每15节点加一圈，节点号 mod 圈数决定在哪圈
+      let ringCount = Math.min(Math.ceil(V / 15), V);
+      let outerR = Math.min(W, H) * 0.42;
+      let innerR = Math.min(W, H) * 0.14;
+      // 每圈节点数
+      let ringCounts = Array(ringCount).fill(0);
+      for (let i = 0; i < V; i++) ringCounts[i % ringCount]++;
+      let ringPos = Array(ringCount).fill(0);
       for (let i = 0; i < V; i++) {
-        if (i % 2 === 0) evens.push(i); else odds.push(i);
-      }
-      let evenCount = evens.length, oddCount = odds.length;
-      for (let i = 0; i < V; i++) {
-        let angle;
-        if (i % 2 === 0) {
-          let idx = evens.indexOf(i);
-          angle = (idx / evenCount) * 2 * Math.PI - Math.PI / 2;
-          nodes.push({ x: cx + outerR * Math.cos(angle), y: cy + outerR * Math.sin(angle), label: String(i) });
-        } else {
-          let idx = odds.indexOf(i);
-          angle = (idx / oddCount) * 2 * Math.PI - Math.PI / 2;
-          nodes.push({ x: cx + innerR * Math.cos(angle), y: cy + innerR * Math.sin(angle), label: String(i) });
-        }
+        let r = i % ringCount;
+        let radius = outerR - (outerR - innerR) * r / Math.max(1, ringCount - 1);
+        let angle = (ringPos[r] / ringCounts[r]) * 2 * Math.PI - Math.PI / 2;
+        nodes.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), label: String(i) });
+        ringPos[r]++;
       }
     } else {
       let radius = Math.min(W, H) * 0.35;
