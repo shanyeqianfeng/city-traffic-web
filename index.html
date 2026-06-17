@@ -471,7 +471,7 @@ function formatResult(result, input) {
       bar = '[' + '█'.repeat(w) + '░'.repeat(20-w) + ']';
     }
     let status = f >= cap && cap > 0 ? ' ⚠ 瓶颈' : '';
-    s += '  ' + padDisp(u + ' → ' + v, 8) + '  ' + padDisp(f + '/' + cap, 12) + '  (' + padDisp(pct, 6) + ')  ' + bar + status + '\n';
+    s += '  ' + padDisp(u + ' → ' + v, 6) + ' ' + padDisp(f + '/' + cap, 10) + ' (' + padDisp(pct, 5) + ') ' + bar + status + '\n';
   }
 
   s += '\n  瓶颈路段（最小割）:\n';
