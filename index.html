@@ -12,14 +12,13 @@ body { font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif; ba
 .header h1 { font-size: 24px; font-weight: 600; }
 .header p { font-size: 14px; opacity: 0.85; margin-top: 4px; }
 
-.container { max-width: 1400px; margin: 0 auto; padding: 20px; display: flex; gap: 20px; flex-wrap: wrap; }
+.container { max-width: 1600px; margin: 0 auto; padding: 20px; display: flex; gap: 20px; align-items: stretch; }
 .panel { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 20px; }
-
-.input-panel { flex: 0 0 380px; min-width: 320px; }
-.output-panel { flex: 1; min-width: 500px; }
-.graph-panel { flex: 0 0 420px; min-width: 360px; height: 480px; overflow: hidden; position: relative; }
-.graph-panel canvas { cursor: grab; }
-.graph-panel canvas:active { cursor: grabbing; }
+.left-col { flex: 0 0 460px; display: flex; flex-direction: column; gap: 20px; min-width: 380px; }
+.right-col { flex: 1; display: flex; min-width: 420px; }
+.input-panel { flex: none; }
+.output-panel { flex: 1; min-height: 200px; }
+.graph-panel { flex: 1; height: auto; min-height: 400px; overflow: hidden; position: relative; }
 
 .panel-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #1a73e8; padding-bottom: 8px; border-bottom: 2px solid #e8edf3; }
 
@@ -48,7 +47,7 @@ textarea#edgeInput { height: 160px; }
 
 .output-box { padding: 12px; background: #f8fafc; border: 1px solid #e8edf3; border-radius: 6px; font-family: 'Consolas', 'Source Code Pro', monospace; font-size: 13px; min-height: 300px; max-height: 600px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; }
 
-svg#graphSvg { width: 100%; height: 360px; border: 1px solid #e8edf3; border-radius: 6px; background: #fafbfc; display: block; cursor: grab; user-select: none; -webkit-user-select: none; }
+svg#graphSvg { width: 100%; height: 100%; min-height: 360px; border: 1px solid #e8edf3; border-radius: 6px; background: #fafbfc; display: block; cursor: grab; user-select: none; -webkit-user-select: none; }
 svg#graphSvg:active { cursor: grabbing; }
 
 .demo-btn { margin-top: 8px; }
@@ -80,6 +79,7 @@ svg#graphSvg:active { cursor: grabbing; }
 </div>
 
 <div class="container">
+  <div class="left-col">
   <!-- 输入面板 -->
   <div class="panel input-panel">
     <div class="panel-title">📐 网络输入</div>
@@ -151,13 +151,15 @@ svg#graphSvg:active { cursor: grabbing; }
       </div>
     </div>
   </div>
-
   <!-- 输出面板 -->
   <div class="panel output-panel">
     <div class="panel-title">📊 计算结果</div>
     <div id="output" class="output-box">点击"计算最大流"开始...</div>
   </div>
+  </div>
 
+  <!-- 右侧：拓扑网络 -->
+  <div class="right-col">
   <!-- 图形面板 -->
   <div class="panel graph-panel">
     <div class="panel-title">🗺 网络拓扑</div>
@@ -174,6 +176,7 @@ svg#graphSvg:active { cursor: grabbing; }
         <button onclick="resetView()" style="font-size:12px;padding:2px 8px;border:1px solid #d0d5dd;border-radius:4px;background:#fff;cursor:pointer;">重置</button>
       </div>
     </div>
+  </div>
   </div>
 </div>
 
@@ -520,10 +523,16 @@ function drawGraph(V, edges, flowMatrix, reachable, s, t) {
   let svg = document.getElementById('graphSvg');
   let parent = svg.parentElement;
   let W = parent.clientWidth - 0;
-  let H = 360;
+  // 用面板可用高度，至少360px
+  let titleH = parent.querySelector('.panel-title')?.offsetHeight || 40;
+  let legendH = parent.querySelector('.legend')?.offsetHeight || 30;
+  let pad = 20;
+  let H = Math.max(360, parent.clientHeight - titleH - legendH - pad);
   svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
   svg.setAttribute('width', W);
   svg.setAttribute('height', H);
+  // 隐藏占位提示
+  svg.style.display = 'block';
 
   graphCache = { V, edges, flowMatrix, reachable, s, t };
   delete graphCache._layoutNodes;
