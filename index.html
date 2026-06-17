@@ -97,8 +97,8 @@ canvas#graphCanvas { width: 100%; height: 360px; border: 1px solid #e8edf3; bord
         </div>
       </div>
       <div class="section">
-        <label>道路列表（每行: 起点 终点 容量）</label>
-        <textarea id="edgeInput" placeholder="0 1 10&#10;0 2 10&#10;1 3 4&#10;...">0 1 10
+        <label>道路列表（每行: 起点 终点 容量1 [容量2 容量3...]）</label>
+        <textarea id="edgeInput" placeholder="0 1 10 15&#10;0 2 10 12&#10;1 3 4 6&#10;多容量=多时段动态模拟">0 1 10
 0 2 10
 1 2 2
 1 3 4
@@ -107,8 +107,15 @@ canvas#graphCanvas { width: 100%; height: 360px; border: 1px solid #e8edf3; bord
 3 5 10
 4 5 10</textarea>
       </div>
+      <div class="section">
+        <label style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:#888;">动态时段名称（逗号分隔）：</span>
+          <input type="text" id="periodNames" value="高峰期,低峰期" style="flex:1;padding:6px 8px;border:1px solid #d0d5dd;border-radius:6px;font-size:13px;outline:none;">
+        </label>
+      </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="computeMaxFlow()">▶ 计算最大流</button>
+        <button class="btn btn-warning" onclick="manualDynamic()">📊 动态模拟</button>
         <button class="btn btn-secondary" onclick="clearOutput()">清空</button>
       </div>
     </div>
@@ -344,10 +351,13 @@ function parseInput(mode) {
     let text = document.getElementById('edgeInput').value.trim();
     let lines = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
     let edges = [];
+    let numPeriods = 1;
     for (let line of lines) {
       let parts = line.trim().split(/\s+/);
       if (parts.length >= 3) {
-        edges.push([parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2])]);
+        let cap = parseInt(parts[2]);
+        edges.push([parseInt(parts[0]), parseInt(parts[1]), cap]);
+        if (parts.length > 3) numPeriods = Math.max(numPeriods, parts.length - 2);
       }
     }
     if (edges.length !== E) {
@@ -355,7 +365,17 @@ function parseInput(mode) {
       writeLog('错误: ' + err);
       return null;
     }
-    return { V, E, s, t, edges };
+    // Extract multi-period capacities
+    let allCaps = [];
+    for (let line of lines) {
+      let parts = line.trim().split(/\s+/);
+      if (parts.length >= 3) {
+        let caps = [];
+        for (let i = 2; i < parts.length; i++) caps.push(parseInt(parts[i]));
+        allCaps.push(caps);
+      }
+    }
+    return { V, E, s, t, edges, numPeriods, allCaps };
   }
   return null;
 }
@@ -491,55 +511,74 @@ function formatResult(result, input) {
   return s;
 }
 
-// ============ 动态模拟 ============
+// ============ 手动动态模拟 ============
+function manualDynamic() {
+  let input = parseInput('manual');
+  if (!input) return;
+  if (input.numPeriods < 2) {
+    writeLog('需在道路列表中添加多个容量值才能运行动态模拟。\n格式：每行 "起点 终点 容量1 容量2 ..."\n如: 0 1 10 15 表示高峰期10、低峰期15');
+    return;
+  }
+  let names = document.getElementById('periodNames').value.trim().split(/[,，\s]+/).filter(Boolean);
+  while (names.length < input.numPeriods) names.push('时段' + (names.length + 1));
+  runDynamicReport(input.V, input.E, input.s, input.t, input.allCaps, input.edges.map(e => [e[0], e[1]]), names, '手动数据');
+}
+
+// ============ 预设动态模拟 ============
 function runDynamicSim() {
   let val = document.getElementById('presetSelect').value;
   let dp = DYNAMIC_PRESETS[val];
   if (!dp) {
-    writeLog('错误: 请在预设中选择一个动态数据（动态演示 / 动态桥梁 / 动态环状）');
+    // 尝试手动
+    manualDynamic();
     return;
   }
 
   let n = dp.periodNames.length;
+  runDynamicReport(dp.V, dp.E, dp.s, dp.t, dp.capacities, dp.edges, dp.periodNames, dp.name);
+}
 
-  let s = '';
-  s += '========================================\n';
-  s += '  动态流量模拟 — ' + dp.name + '\n';
-  s += '  网络: ' + dp.V + ' 节点, ' + dp.E + ' 条道路\n';
-  s += '  时段数: ' + n + ' (' + dp.periodNames.join(', ') + ')\n';
-  s += '========================================\n\n';
+// ============ 动态报告生成（通用） ============
+function runDynamicReport(V, E, s, t, allCaps, edgePairs, periodNames, name) {
+  let n = periodNames.length;
+  let sOut = '';
+  sOut += '========================================\n';
+  sOut += '  动态流量模拟 — ' + name + '\n';
+  sOut += '  网络: ' + V + ' 节点, ' + E + ' 条道路\n';
+  sOut += '  时段数: ' + n + ' (' + periodNames.join(', ') + ')\n';
+  sOut += '========================================\n\n';
 
   let results = [];
   let maxAcross = 0;
   for (let pi = 0; pi < n; pi++) {
-    let capList = dp.capacities[pi];
-    let edges = dp.edges.map((e, i) => [e[0], e[1], capList[i]]);
-    let res = edmondsKarp(dp.V, edges, dp.s, dp.t);
+    let capList = allCaps[pi];
+    let edges = edgePairs.map((e, i) => [e[0], e[1], capList[i]]);
+    let res = edmondsKarp(V, edges, s, t);
     results.push(res);
     if (res.maxFlow > maxAcross) maxAcross = res.maxFlow;
   }
 
   // 对比表格
   let col1 = 12, col2 = 14;
-  s += '  +-----------+---------------+---------------+' + '\n';
-  s += '  | ' + padDisp('时段', col1) + ' | ' + padDisp('最大流量', col2) + ' | ' + padDisp('相对比值', col2) + ' |' + '\n';
-  s += '  +-----------+---------------+---------------+' + '\n';
+  sOut += '  +-----------+---------------+---------------+' + '\n';
+  sOut += '  | ' + padDisp('时段', col1) + ' | ' + padDisp('最大流量', col2) + ' | ' + padDisp('相对比值', col2) + ' |' + '\n';
+  sOut += '  +-----------+---------------+---------------+' + '\n';
   for (let pi = 0; pi < n; pi++) {
     let ratio = maxAcross > 0 ? (results[pi].maxFlow / maxAcross * 100).toFixed(1) + '%' : '0%';
-    s += '  | ' + padDisp(dp.periodNames[pi], col1) + ' | ' + padDisp(String(results[pi].maxFlow), col2) + ' | ' + padDisp(ratio, col2) + ' |' + '\n';
+    sOut += '  | ' + padDisp(periodNames[pi], col1) + ' | ' + padDisp(String(results[pi].maxFlow), col2) + ' | ' + padDisp(ratio, col2) + ' |' + '\n';
   }
-  s += '  +-----------+---------------+---------------+' + '\n';
+  sOut += '  +-----------+---------------+---------------+' + '\n';
 
   // 时段详情
   for (let pi = 0; pi < n; pi++) {
-    s += '\n  * ' + dp.periodNames[pi] + '\n';
-    s += '  最大流量: ' + results[pi].maxFlow + '\n';
-    s += '  流量分配:\n';
-    for (let i = 0; i < dp.edges.length; i++) {
-      let [u, v] = dp.edges[i];
+    sOut += '\n  * ' + periodNames[pi] + '\n';
+    sOut += '  最大流量: ' + results[pi].maxFlow + '\n';
+    sOut += '  流量分配:\n';
+    for (let i = 0; i < edgePairs.length; i++) {
+      let [u, v] = edgePairs[i];
       let f = results[pi].flowMatrix[u][v] || 0;
-      let cap = dp.capacities[pi][i];
-      s += '    ' + u + ' → ' + v + '  ' + f + '/' + cap + '\n';
+      let cap = allCaps[pi][i];
+      sOut += '    ' + u + ' → ' + v + '  ' + f + '/' + cap + '\n';
     }
   }
 
@@ -552,23 +591,23 @@ function runDynamicSim() {
   let diff = results[maxIdx].maxFlow - results[minIdx].maxFlow;
   let diffPct = maxAcross > 0 ? (diff / maxAcross * 100).toFixed(1) : '0.0';
 
-  s += '\n  ' + dp.periodNames[maxIdx] + '通行能力最强: ' + results[maxIdx].maxFlow + ' 辆/小时\n';
-  s += '  ' + dp.periodNames[minIdx] + '通行能力最弱: ' + results[minIdx].maxFlow + ' 辆/小时\n';
-  s += '  峰谷差: ' + diff + ' ( ' + diffPct + '% )\n\n';
-  s += '  优化策略建议:\n';
+  sOut += '\n  ' + periodNames[maxIdx] + '通行能力最强: ' + results[maxIdx].maxFlow + ' 辆/小时\n';
+  sOut += '  ' + periodNames[minIdx] + '通行能力最弱: ' + results[minIdx].maxFlow + ' 辆/小时\n';
+  sOut += '  峰谷差: ' + diff + ' ( ' + diffPct + '% )\n\n';
+  sOut += '  优化策略建议:\n';
   if (diff > 0) {
-    s += '  * 考虑潮汐车道：在' + dp.periodNames[minIdx] + '将部分车道改为出城方向\n';
-    s += '  * 错峰出行引导：将部分交通流引导至' + dp.periodNames[maxIdx] + '时段\n';
+    sOut += '  * 考虑潮汐车道：在' + periodNames[minIdx] + '将部分车道改为出城方向\n';
+    sOut += '  * 错峰出行引导：将部分交通流引导至' + periodNames[maxIdx] + '时段\n';
   }
-  s += '  * 持续监控瓶颈路段，动态调整信号灯配时\n';
+  sOut += '  * 持续监控瓶颈路段，动态调整信号灯配时\n';
 
-  writeLog(s);
+  writeLog(sOut);
   // 使用最后一个时段绘制
   let lastResult = results[n-1];
-  let lastCap = dp.capacities[n-1];
-  let lastEdges = dp.edges.map((e, i) => [e[0], e[1], lastCap[i]]);
-  drawGraph(dp.V, lastEdges, lastResult.flowMatrix, lastResult.reachable, dp.s, dp.t);
-  graphCache = { V: dp.V, E: dp.E, s: dp.s, t: dp.t, edges: lastEdges };
+  let lastCap = allCaps[n-1];
+  let lastEdges = edgePairs.map((e, i) => [e[0], e[1], lastCap[i]]);
+  drawGraph(V, lastEdges, lastResult.flowMatrix, lastResult.reachable, s, t);
+  graphCache = { V, E, s, t, edges: lastEdges };
 }
 
 function padDisp(s, w) {
