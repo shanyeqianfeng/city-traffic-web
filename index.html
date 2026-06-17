@@ -357,25 +357,11 @@ function parseInput(mode) {
     let lines = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
     if (lines.length === 0) return null;
 
-    // 检测第一行是否为头部: 4个数字，且后续每行≥3个数字
-    let first = lines[0].trim().split(/\s+/);
-    let hasHeader = first.length === 4 && lines.length > 1 && lines[1].trim().split(/\s+/).length >= 3;
-
-    let V, E, s, t;
-    let edgeLines = lines;
-    if (hasHeader) {
-      V = parseInt(first[0]);
-      E = parseInt(first[1]);
-      s = parseInt(first[2]);
-      t = parseInt(first[3]);
-      edgeLines = lines.slice(1);
-    }
-
-    // 解析所有边
+    // 先解析所有非空行作为边数据
     let edges = [];
     let maxV = 0;
     let numPeriods = 1;
-    for (let line of edgeLines) {
+    for (let line of lines) {
       let parts = line.trim().split(/\s+/);
       if (parts.length >= 3) {
         let u = parseInt(parts[0]), v = parseInt(parts[1]);
@@ -387,7 +373,25 @@ function parseInput(mode) {
       }
     }
 
-    if (!hasHeader) {
+    // 检测第一行是否为头部: 4个数字，且第1个数>所有节点号，且第2个数=边数
+    let first = lines[0].trim().split(/\s+/);
+    let hasHeader = first.length === 4 && parseInt(first[0]) > maxV && parseInt(first[1]) === edges.length;
+
+    let V, E, s, t;
+    let edgeLines = lines;
+    if (hasHeader) {
+      V = parseInt(first[0]);
+      E = parseInt(first[1]);
+      s = parseInt(first[2]);
+      t = parseInt(first[3]);
+      edgeLines = lines.slice(1);
+      // 核对边数
+      if (edges.length !== E) {
+        let err = '边数不匹配: 声明 ' + E + ' 条, 实际 ' + edges.length + ' 条';
+        writeLog('错误: ' + err);
+        return null;
+      }
+    } else {
       V = maxV + 1;
       E = edges.length;
       s = 0;
@@ -397,23 +401,23 @@ function parseInput(mode) {
       document.getElementById('edges').value = E;
       document.getElementById('source').value = s;
       document.getElementById('sink').value = t;
-    } else if (edges.length !== E) {
-      let err = '边数不匹配: 声明 ' + E + ' 条, 实际 ' + edges.length + ' 条';
-      writeLog('错误: ' + err);
-      return null;
     }
 
-    // 提取多时段容量
+    // 重新解析边数据（确保无头部时 rows 与 edgeLines 一致）
     let allCaps = [];
+    let reparseEdges = [];
     for (let line of edgeLines) {
       let parts = line.trim().split(/\s+/);
       if (parts.length >= 3) {
+        let u = parseInt(parts[0]), v = parseInt(parts[1]);
+        let cap = parseInt(parts[2]);
+        reparseEdges.push([u, v, cap]);
         let caps = [];
         for (let i = 2; i < parts.length; i++) caps.push(parseInt(parts[i]));
         allCaps.push(caps);
       }
     }
-    return { V, E, s, t, edges, numPeriods, allCaps };
+    return { V, E, s, t, edges: reparseEdges, numPeriods, allCaps };
   }
   return null;
 }
