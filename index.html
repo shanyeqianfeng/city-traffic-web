@@ -347,33 +347,62 @@ function edmondsKarp(V, edges, s, t) {
   return { maxFlow: flow, flowMatrix, reachable, adj, edgeList };
 }
 
-// ============ 解析输入 ============
+// ============ 解析输入（自动识别） ============
 function parseInput(mode) {
   if (mode === 'manual') {
-    let V = parseInt(document.getElementById('vertices').value);
-    let E = parseInt(document.getElementById('edges').value);
-    let s = parseInt(document.getElementById('source').value);
-    let t = parseInt(document.getElementById('sink').value);
     let text = document.getElementById('edgeInput').value.trim();
     let lines = text.split('\n').filter(l => l.trim() && !l.trim().startsWith('#'));
+    if (lines.length === 0) return null;
+
+    // 检测第一行是否为头部: 4个数字，且后续每行≥3个数字
+    let first = lines[0].trim().split(/\s+/);
+    let hasHeader = first.length === 4 && lines.length > 1 && lines[1].trim().split(/\s+/).length >= 3;
+
+    let V, E, s, t;
+    let edgeLines = lines;
+    if (hasHeader) {
+      V = parseInt(first[0]);
+      E = parseInt(first[1]);
+      s = parseInt(first[2]);
+      t = parseInt(first[3]);
+      edgeLines = lines.slice(1);
+    }
+
+    // 解析所有边
     let edges = [];
+    let maxV = 0;
     let numPeriods = 1;
-    for (let line of lines) {
+    for (let line of edgeLines) {
       let parts = line.trim().split(/\s+/);
       if (parts.length >= 3) {
+        let u = parseInt(parts[0]), v = parseInt(parts[1]);
         let cap = parseInt(parts[2]);
-        edges.push([parseInt(parts[0]), parseInt(parts[1]), cap]);
+        edges.push([u, v, cap]);
+        if (u > maxV) maxV = u;
+        if (v > maxV) maxV = v;
         if (parts.length > 3) numPeriods = Math.max(numPeriods, parts.length - 2);
       }
     }
-    if (edges.length !== E) {
+
+    if (!hasHeader) {
+      V = maxV + 1;
+      E = edges.length;
+      s = 0;
+      t = V - 1;
+      // 自动填回输入框
+      document.getElementById('vertices').value = V;
+      document.getElementById('edges').value = E;
+      document.getElementById('source').value = s;
+      document.getElementById('sink').value = t;
+    } else if (edges.length !== E) {
       let err = '边数不匹配: 声明 ' + E + ' 条, 实际 ' + edges.length + ' 条';
       writeLog('错误: ' + err);
       return null;
     }
-    // Extract multi-period capacities
+
+    // 提取多时段容量
     let allCaps = [];
-    for (let line of lines) {
+    for (let line of edgeLines) {
       let parts = line.trim().split(/\s+/);
       if (parts.length >= 3) {
         let caps = [];
