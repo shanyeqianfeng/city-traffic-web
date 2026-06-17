@@ -443,16 +443,24 @@ function resetView() {
   renderGraph();
 }
 
+function seededRandom(seed) {
+  let s = seed >>> 0;
+  return function() {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return (s & 0x7fffffff) / 0x80000000;
+  };
+}
+
 function forceDirectedLayout(V, edges, W, H, nodeR) {
-  // Fruchterman-Reingold 力导向布局
+  // Fruchterman-Reingold 力导向布局（确定性随机种子）
   let area = W * H;
-  let k = Math.sqrt(area / V) * 0.9;  // 理想距离
+  let k = Math.sqrt(area / V) * 0.9;
   let nodes = [];
   let pad = nodeR * 2 + 10;
-  // 初始位置：随机分布在中心区域
+  let rng = seededRandom(V + edges.length * 137);
   for (let i = 0; i < V; i++) {
-    let angle = Math.random() * 2 * Math.PI;
-    let r = Math.random() * Math.min(W, H) * 0.3;
+    let angle = rng() * 2 * Math.PI;
+    let r = rng() * Math.min(W, H) * 0.3;
     nodes.push({
       x: W / 2 + r * Math.cos(angle),
       y: H / 2 + r * Math.sin(angle),
@@ -573,8 +581,8 @@ function renderGraph() {
     graphCache._layoutNodes = nodes;
   }
 
-  // 对大型图只绘制非零流量的边标签
-  let showEdgeLabel = V <= 18;
+  // 标签显示：小型图始终全标；大图只标有流量的边，但放大到>70%时全标
+  let showEdgeLabel = V <= 18 || sc > 0.7;
 
   // 绘制边
   for (let e of edges) {
