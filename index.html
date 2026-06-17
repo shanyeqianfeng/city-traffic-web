@@ -577,7 +577,8 @@ function renderGraph() {
       for (let i = 0; i < V; i++) {
         let r = i % ringCount;
         let radius = outerR - (outerR - innerR) * r / Math.max(1, ringCount - 1);
-        let angle = (ringPos[r] / ringCounts[r]) * 2 * Math.PI - Math.PI / 2;
+        let offset = r * Math.PI / ringCounts[r]; // 每层错开半格，防边重叠
+        let angle = (ringPos[r] / ringCounts[r]) * 2 * Math.PI + offset - Math.PI / 2;
         nodes.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), label: String(i) });
         ringPos[r]++;
       }
