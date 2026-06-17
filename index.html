@@ -443,6 +443,79 @@ function resetView() {
   renderGraph();
 }
 
+function forceDirectedLayout(V, edges, W, H, nodeR) {
+  // Fruchterman-Reingold 力导向布局
+  let area = W * H;
+  let k = Math.sqrt(area / V) * 0.9;  // 理想距离
+  let nodes = [];
+  let pad = nodeR * 2 + 10;
+  // 初始位置：随机分布在中心区域
+  for (let i = 0; i < V; i++) {
+    let angle = Math.random() * 2 * Math.PI;
+    let r = Math.random() * Math.min(W, H) * 0.3;
+    nodes.push({
+      x: W / 2 + r * Math.cos(angle),
+      y: H / 2 + r * Math.sin(angle),
+      label: String(i),
+      dx: 0, dy: 0
+    });
+  }
+
+  // 构建邻接表
+  let adj = Array.from({ length: V }, () => []);
+  for (let e of edges) {
+    adj[e[0]].push(e[1]);
+    adj[e[1]].push(e[0]);
+  }
+
+  let iterations = 150;
+  for (let iter = 0; iter < iterations; iter++) {
+    let temp = 1 - iter / iterations;  // 温度衰减
+    // 清零
+    for (let i = 0; i < V; i++) { nodes[i].dx = 0; nodes[i].dy = 0; }
+    // 斥力（所有节点对）
+    for (let i = 0; i < V; i++) {
+      for (let j = i + 1; j < V; j++) {
+        let dx = nodes[j].x - nodes[i].x;
+        let dy = nodes[j].y - nodes[i].y;
+        let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        let force = k * k / dist;  // 斥力 = k^2 / dist
+        let fx = force * dx / dist;
+        let fy = force * dy / dist;
+        nodes[i].dx -= fx;
+        nodes[i].dy -= fy;
+        nodes[j].dx += fx;
+        nodes[j].dy += fy;
+      }
+    }
+    // 引力（沿边）
+    for (let e of edges) {
+      let u = e[0], v = e[1];
+      let dx = nodes[v].x - nodes[u].x;
+      let dy = nodes[v].y - nodes[u].y;
+      let dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      let force = dist * dist / k;  // 引力 = dist^2 / k
+      let fx = force * dx / dist;
+      let fy = force * dy / dist;
+      nodes[u].dx += fx;
+      nodes[u].dy += fy;
+      nodes[v].dx -= fx;
+      nodes[v].dy -= fy;
+    }
+    // 应用位移 + 边界约束
+    for (let i = 0; i < V; i++) {
+      let n = nodes[i];
+      let disp = Math.sqrt(n.dx*n.dx + n.dy*n.dy) || 1;
+      let move = Math.min(disp, temp * k);
+      n.x += move * n.dx / disp;
+      n.y += move * n.dy / disp;
+      n.x = Math.max(pad, Math.min(W - pad, n.x));
+      n.y = Math.max(pad, Math.min(H - pad, n.y));
+    }
+  }
+  return nodes;
+}
+
 function updateZoomLabel() {
   let el = document.getElementById('zoomLevel');
   if (el) el.textContent = Math.round(viewState.sc * 100) + '%';
@@ -480,18 +553,19 @@ function renderGraph() {
   ctx.save();
   ctx.setTransform(sc, 0, 0, sc, ox, oy);
 
-  // 节点位置（固定坐标系，transform 统一缩放）
-  let cx = W / 2, cy = H / 2;
-  let radius = Math.min(W, H) * 0.35;
+  // 节点位置 — 大图用力导向布局，小图用圆形布局
   let nodeR = 16, fontSize = 13, labelFont = 11, arrowS = 8;
-  let nodes = [];
-  for (let i = 0; i < V; i++) {
-    let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
-    nodes.push({
-      x: cx + radius * Math.cos(angle),
-      y: cy + radius * Math.sin(angle),
-      label: String(i)
-    });
+  let nodes;
+  if (V > 14) {
+    nodes = forceDirectedLayout(V, edges, W, H, nodeR);
+  } else {
+    let cx = W / 2, cy = H / 2;
+    let radius = Math.min(W, H) * 0.35;
+    nodes = [];
+    for (let i = 0; i < V; i++) {
+      let angle = (i / V) * 2 * Math.PI - Math.PI / 2;
+      nodes.push({ x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle), label: String(i) });
+    }
   }
 
   // 对大型图只绘制非零流量的边标签
